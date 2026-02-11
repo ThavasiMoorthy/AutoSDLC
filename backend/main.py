@@ -1,9 +1,13 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from pathlib import Path
 import asyncio
 import uuid
+import os
 from typing import Dict, List, Optional
 
 from .models import ProjectBrief, ProjectState
@@ -38,6 +42,10 @@ prototype_agent = PrototypeAgent()
 
 @app.get("/")
 def read_root():
+    # In production, serve the built React frontend
+    index_file = Path(__file__).parent.parent / "client" / "dist" / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
     return {"message": "AutoSDLC API is running"}
 
 @app.get("/health")
@@ -135,3 +143,20 @@ Be concise, helpful, and technical. Use markdown formatting."""
         return {"reply": reply}
     except Exception as e:
         return {"reply": f"Sorry, I encountered an error: {str(e)}"}
+
+# === STATIC FILE SERVING (Production) ===
+# Mount built React frontend if it exists (after npm run build)
+_client_dist = Path(__file__).parent.parent / "client" / "dist"
+if _client_dist.exists():
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=str(_client_dist / "assets")), name="static-assets")
+    
+    # SPA catch-all: serve index.html for any non-API route
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # If the path is an API route, FastAPI handles it above
+        # Otherwise serve the SPA
+        file_path = _client_dist / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(_client_dist / "index.html"))

@@ -7,7 +7,9 @@ import {
 } from 'lucide-react'
 import { ProjectBrief, ProjectState } from './types'
 
-const API = 'http://localhost:8000';
+// In production (Railway), frontend is served from the same origin as the API
+// In development, the Vite dev server runs on :5173 and API on :8000
+const API = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
 
 interface ChatMsg { role: 'user' | 'assistant'; content: string; }
 
